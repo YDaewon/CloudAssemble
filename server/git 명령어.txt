@@ -1,0 +1,13 @@
+git config --global user.name "qkqh9779"
+git config --global user.email "qkqh9860@naver.com"
+git init 
+git add .
+git status
+git commit -m "upload files"
+git remote add origin https://github.com/qkqh9779/CloudAssemble.git
+git push -u origin master
+
+
+set password = password('qwer');
+
+ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY '    ';

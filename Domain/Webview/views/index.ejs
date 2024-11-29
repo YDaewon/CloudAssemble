@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="UTF-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no">
+        <title>간단한 지도 표시하기</title>
+        <script type="text/javascript" src="http://code.jquery.com/jquery-3.5.1.min.js"></script>
+        <script type="text/javascript" src="https://openapi.map.naver.com/openapi/v3/maps.js?ncpClientId="></script>
+        <script src="https://developers.kakao.com/sdk/js/kakao.js"></script>
+        <style>
+            .switch {
+            position: relative;
+            display: inline-block;
+            width: 60px;
+            height: 34px;
+            vertical-align:middle;
+            }
+
+            /* Hide default HTML checkbox */
+            .switch input {display:none;}
+
+            /* The slider */
+            .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            -webkit-transition: .4s;
+            transition: .4s;
+            }
+
+            .slider:before {
+            position: absolute;
+            content: "";
+            height: 26px;
+            width: 26px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            -webkit-transition: .4s;
+            transition: .4s;
+            }
+
+            input:checked + .slider {
+            background-color: #2196F3;
+            }
+
+            input:focus + .slider {
+            box-shadow: 0 0 1px #2196F3;
+            }
+
+            input:checked + .slider:before {
+            -webkit-transform: translateX(26px);
+            -ms-transform: translateX(26px);
+            transform: translateX(26px);
+            }
+
+            /* Rounded sliders */
+            .slider.round {
+            border-radius: 34px;
+            -webkit-tap-highlight-color: rgba(0, 0, 0, 0);
+            }
+
+            .slider.round:before {
+            border-radius: 50%;
+            }
+            p {
+                margin:0px;
+                display:inline-block;
+                font-size:15px;
+                font-weight:bold;
+            }
+            @font-face { 
+            font-family: "NanumSquareRoundEB";  
+            src:url("./Fonts/NanumSquareRoundEB") format("ttf");
+            font-style:normal;  /* 선택속성 */
+            font-weight:normal;  /* 선택속성 */
+            }
+            #toggle {
+                padding-top: 30px;
+                padding-right: 10px;
+            }
+            #toggletext {
+                margin-right: 10px;
+                font-family: "Nanum Gothic", sans-serif;
+                font-weight: bold;
+                font-size: 15px;
+            }
+        </style>
+    </head>
+    <body>
+        <div id="mapView" style="width:100%;height:99vh;"></div>
+        <script type="text/javascript">
+            var JAVASCRIPT_KEY='';
+            Kakao.init('JAVASCRIPT_KEY');
+            console.log("Kakao isInitialized:",Kakao.isInitialized()); 
+            var MY_URL = "http://localhost:3000"
+            var data = $.getJSON({'url': `${MY_URL}/init`, 'async': false}).responseText;
+            temp = JSON.parse(data);
+            var map;
+            var flag = 0;
+            function getParameterByName(name, url) {
+                name = name.replace(/[\[]/, "\\[").replace(/[\]]/, "\\]");
+                var regex = new RegExp("[\\?&]" + name + "=([^&#]*)"),
+                results = regex.exec(location.search);
+                return results == null ? "" : decodeURIComponent(results[1].replace(/\+/g, " "));
+            }
+
+            function getNonSmokingArea() {
+                var list = JSON.parse('<%-JSON.stringify(sdata)%>');
+                return list;
+            }
+
+            var tempmarkdata = $.getJSON({'url': `${MY_URL}/smkview`, 'async': false}).responseText;
+            markerdata = JSON.parse(tempmarkdata);
+            console.log(markerdata);
+            function doImgPop(img){
+                img1= new Image();
+                img1.src=(img);
+                imgControll(img);
+            }
+                
+            function imgControll(img){
+                if((img1.width!=0)&&(img1.height!=0)){
+                    viewImage(img);
+                }
+                else{
+                    controller="imgControll('"+img+"')";
+                    intervalID=setTimeout(controller,20);
+                }
+            }
+
+            function viewImage(img){
+                imgWin=window.open(img, onclick=self.close());
+                //imgWin.document.write("<html><head><title>이미지상세보기</title></head>");
+                //imgWin.document.write("<body>");
+                //imgWin.document.write("<img src="+img+" onclick='self.close()' style='cursor:pointer;' title ='클릭하시면 창이 닫힙니다.'>");
+                imgWin.document.close();
+            }
+            var infowindow = [];
+            function setMarker(markerdata)
+            {
+                    var position = new naver.maps.LatLng(markerdata.latitude, markerdata.longitude);
+                    var marker =  new naver.maps.Marker({
+                            position: position,
+                            map: map,
+                            visible: false,
+                        });
+                    var tempwindow = new naver.maps.InfoWindow({
+                    content:[
+                        '<div>',
+                        '   <h3>' + markerdata.text + '</h3>',
+                        '       <img src="'+ markerdata.image +'" width="300" height="300" alt="'+ markerdata.text + '" onclick="window.open(this.src)"/>',
+                        '</div>'
+                    ].join('')
+                });
+                naver.maps.Event.addListener(marker, "click", function(e) {
+                    if (tempwindow.getMap()) {
+                        tempwindow.close();
+                    } else {
+                        tempwindow.open(map, marker);
+                    }
+                });
+                infowindow.push(tempwindow);
+                return marker;
+            }
+            startDataLayer(temp.features);
+            function startDataLayer(geojson) {
+
+                var lat = getParameterByName('latitude');
+                var lng = getParameterByName('longitude');
+
+                //행정구역 정보
+                $.ajax({
+                        url:'https://dapi.kakao.com/v2/local/geo/coord2regioncode.json?input_coord=WGS84&output_coord=WGS84&x='+lng+'&y='+lat,
+                        type:'GET',
+                        headers: {'Authorization' : 'KakaoAK'},
+                success:function(data){
+                    //console.log(data);
+                },
+                error : function(e){
+                    //console.log(e);
+                }
+                });
+
+
+                map = new naver.maps.Map('mapView', {
+                    zoom: 20,
+                    center: new naver.maps.LatLng(lat, lng)
+                });
+                Object.keys(geojson).forEach(function(k){
+                    map.data.addGeoJson(geojson[k]);
+                })
+
+                map.data.setStyle(function(feature) {
+                    var color = 'red';
+
+                    if (feature.getProperty('isColorful')) {
+                        color = feature.getProperty('color');
+                    }
+
+                    return {
+                        fillColor: color,
+                        strokeColor: color,
+                        strokeWeight: 2,
+                        icon: null
+                    };
+                });
+            }
+
+            var locationBtnHtml = '<div id ="toggle"><p id = "toggletext">흡연구역 표시</p><label class="switch"><input type="checkbox"><span class="slider round"></span></label></div>';
+            var customControl = new naver.maps.CustomControl(locationBtnHtml, {
+                padding: 10,
+                position: naver.maps.Position.TOP_RIGHT
+            });
+            var count = 0;
+            var viewmarker = [];
+            Object.keys(markerdata).forEach(function(k){
+                viewmarker.push(setMarker(markerdata[k]));
+            })
+            naver.maps.Event.once(map, 'init_stylemap', function() {
+                customControl.setMap(map);
+            naver.maps.Event.addDOMListener(customControl.getElement(), 'click', function() {
+                if(flag == 0){
+                    count++;
+                    if(count == 2){
+                        Object.keys(markerdata).forEach(function(k){
+                            viewmarker[k].setVisible(true);
+                        })
+                        flag = 1;
+                        count = 0;
+                    }
+                }
+                else if(flag == 1){
+                    count++;
+                    if(count == 2){
+                        Object.keys(markerdata).forEach(function(k){
+                            viewmarker[k].setVisible(false);
+                            infowindow[k].close();
+                        })
+                        flag = 0;
+                        count = 0;
+                    }
+                }
+            });
+            });
+        </script>
+    </body>
+</html>
